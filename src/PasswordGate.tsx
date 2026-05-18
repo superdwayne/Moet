@@ -94,14 +94,16 @@ export default function PasswordGate({ children }: { children: React.ReactNode }
           aria-label="Password"
           style={{
             width: "100%", boxSizing: "border-box",
-            padding: "12px 14px",
+            padding: "14px 14px",
             background: "#fff",
             border: error ? "1px solid #c00016" : "1px solid rgba(14,12,10,0.18)",
             color: "#0e0c0a",
             fontFamily: '"Manrope", system-ui, sans-serif',
-            fontSize: 14, letterSpacing: "0.18em",
+            fontSize: 16,                       /* 16+ avoids iOS zoom-on-focus */
+            letterSpacing: "0.18em",
             textAlign: "center",
             outline: "none",
+            WebkitAppearance: "none",
           }}
         />
 

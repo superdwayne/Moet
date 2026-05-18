@@ -24,6 +24,21 @@ const PHASES: Record<"spiral" | "settle" | "enter", [number, number]> = {
 /* ─────────────────────────────────────────────────────────────────────────
    3D — scroll-driven camera
    ─────────────────────────────────────────────────────────────────────── */
+// Responsive camera FOV — keep the bottle fully framed on portrait phones
+// (where the natural horizontal FOV would otherwise crop the scene). We
+// widen FOV when the viewport is narrow.
+function ResponsiveCamera() {
+  const { camera, size } = useThree();
+  useEffect(() => {
+    if (!(camera as THREE.PerspectiveCamera).isPerspectiveCamera) return;
+    const aspect = size.width / size.height;
+    const pcam = camera as THREE.PerspectiveCamera;
+    pcam.fov = aspect < 0.9 ? 60 : aspect < 1.3 ? 50 : 42;
+    pcam.updateProjectionMatrix();
+  }, [size.width, size.height, camera]);
+  return null;
+}
+
 // Publish ScrollControls offset to a module-scoped ref so DOM siblings
 // rendered outside the R3F Canvas (e.g. the video overlay) can react.
 function ScrollPublisher() {
@@ -474,18 +489,28 @@ function Captions() {
    Scene root
    ─────────────────────────────────────────────────────────────────────── */
 export default function BottleSpiralScene({ modelUrl }: { modelUrl: string }) {
-  const pages = 9;
+  // Less scrollable height on touch devices so each swipe covers a meaningful
+  // chunk of the animation. Tighter damping feels snappier on phones.
+  const { pages, damping } = useMemo(() => {
+    if (typeof window === "undefined") return { pages: 9, damping: 0.18 };
+    const touch = window.matchMedia("(hover: none), (pointer: coarse)").matches;
+    const narrow = window.innerWidth < 820;
+    return touch || narrow
+      ? { pages: 4, damping: 0.10 }
+      : { pages: 9, damping: 0.18 };
+  }, []);
 
   return (
     <Canvas
       shadows
-      gl={{ alpha: true, antialias: true }}
-      dpr={[1, 2]}
+      gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
+      dpr={[1, 1.75]}
       camera={{ fov: 42, position: [3, 2.5, 0], near: 0.1, far: 50 }}
-      style={{ background: "transparent", height: "100vh", width: "100vw" }}
+      style={{ background: "transparent", height: "100dvh", width: "100vw", touchAction: "none" }}
     >
       <StudioLights />
-      <ScrollControls pages={pages} damping={0.18}>
+      <ResponsiveCamera />
+      <ScrollControls pages={pages} damping={damping}>
         <ScrollPublisher />
         <ScrollCamera />
         <CursorLight />

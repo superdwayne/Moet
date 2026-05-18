@@ -2,7 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#d6e4ee" />
     <title>Moët & Chandon × Pharrell Williams — A Shared Art of Celebration</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -29,14 +31,28 @@
 
       *, *::before, *::after { box-sizing: border-box; }
       html, body, #root {
-        margin: 0; padding: 0; height: 100%;
+        margin: 0; padding: 0;
+        height: 100%;
+        height: 100dvh;   /* avoids the mobile-browser-chrome 100vh bug */
         background: var(--bone);
         color: var(--ink);
         font-family: var(--font-sans);
         overflow: hidden;
+        overscroll-behavior: none;
         -webkit-font-smoothing: antialiased;
         text-rendering: optimizeLegibility;
+        -webkit-tap-highlight-color: transparent;
       }
+      canvas { display: block; touch-action: none; }
+
+      /* When the Moët video overlay is on screen, hide the page chrome so it
+         doesn't crowd the close button or distract from the film. */
+      body.video-on .topbar,
+      body.video-on .scroll-cue {
+        opacity: 0; pointer-events: none;
+        transition: opacity 280ms cubic-bezier(0.2, 0.7, 0.1, 1);
+      }
+      .topbar, .scroll-cue { transition: opacity 280ms cubic-bezier(0.2, 0.7, 0.1, 1); }
 
       /* Ice Impérial inspired pale-blue stage */
       .stage {
@@ -95,7 +111,9 @@
 
       /* ===== Minimal corner scroll cue ===== */
       .scroll-cue {
-        position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
+        position: fixed;
+        left: 0; right: 0;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
         z-index: 27;
         display: flex; flex-direction: column; align-items: center; gap: 10px;
         font-family: var(--font-sans);
@@ -163,10 +181,23 @@
       }
 
       @media (max-width: 720px) {
-        .topbar { grid-template-columns: 1fr; gap: 14px; padding: 14px 20px; }
-        .nav-left { justify-self: center; gap: 18px; font-size: 10px; }
-        .nav-right { justify-self: center; }
-        .wordmark { font-size: 16px; }
+        .topbar {
+          top: 8px; left: 8px; right: 8px;
+          grid-template-columns: 1fr;
+          gap: 8px; padding: 12px 16px;
+        }
+        .nav-left, .nav-right {
+          display: none;     /* keep just the wordmark on small screens */
+        }
+        .wordmark { font-size: 15px; letter-spacing: 0.05em; }
+        .scroll-cue { bottom: calc(env(safe-area-inset-bottom, 0px) + 36px); gap: 8px; }
+        .scroll-cue .stem { height: 28px; }
+        .esc-hint { display: none !important; }
+        .tap-hint { display: inline !important; }
+      }
+      @media (hover: none) and (pointer: coarse) {
+        .esc-hint { display: none !important; }
+        .tap-hint { display: inline !important; }
       }
     </style>
   </head>

@@ -34,6 +34,7 @@ export default function MoetVideoOverlay() {
     dismissedRef.current = true;
     if (wrapRef.current) wrapRef.current.style.opacity = "0";
     if (videoRef.current) videoRef.current.pause();
+    document.body.classList.remove("video-on");
     setVisible(false);
     // Scroll back to the top of the experience
     const sc = document.querySelector(
@@ -83,8 +84,16 @@ export default function MoetVideoOverlay() {
       if (desired !== shown) {
         shown = desired;
         if (wrapRef.current) wrapRef.current.style.opacity = shown ? "1" : "0";
+        document.body.classList.toggle("video-on", shown);
         if (shown) {
-          if (v.paused) v.play().catch(() => {});
+          if (v.paused) {
+            // Try with sound first; if the browser blocks it, fall back to
+            // muted so the video still plays.
+            v.play().catch(() => {
+              v.muted = true;
+              v.play().catch(() => {});
+            });
+          }
           if (!visible) setVisible(true);
         } else {
           // Pause + reset only after the CSS fade-out completes
@@ -121,12 +130,17 @@ export default function MoetVideoOverlay() {
       <video
         ref={videoRef}
         src={MOET_VIDEO_URL}
-        muted
         loop
         playsInline
-        autoPlay
         preload="auto"
-        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        style={{
+          width: "100%", height: "100%",
+          /* "contain" so the whole video frame is visible on any aspect ratio
+             — phones in portrait will letterbox top/bottom against the black
+             background instead of cropping the sides of the footage. */
+          objectFit: "contain",
+          display: "block",
+        }}
       />
       <div
         style={{
@@ -137,51 +151,59 @@ export default function MoetVideoOverlay() {
         }}
       />
 
-      {/* Close button — top-right */}
+      {/* Close button — top-right. Big, always visible while the overlay is
+          on screen, comfortably tappable on phones. */}
       <button
         onClick={close}
         aria-label="Close video"
+        className="video-close"
         style={{
-          position: "absolute", top: 28, right: 28, zIndex: 1,
-          display: "inline-flex", alignItems: "center", gap: 12,
-          padding: "10px 16px 10px 18px",
-          background: "rgba(0,0,0,0.42)",
+          position: "absolute",
+          /* Push well below the top nav on mobile so they don't crowd
+             each other and the tap target stays comfortably reachable. */
+          top: "calc(env(safe-area-inset-top, 0px) + 80px)",
+          right: "calc(env(safe-area-inset-right, 0px) + 16px)",
+          zIndex: 2,
+          width: 56, height: 56,
+          minWidth: 56, minHeight: 56,
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(0,0,0,0.55)",
           color: "#fff",
-          border: "1px solid rgba(255,255,255,0.55)",
-          borderRadius: 999,
+          border: "1px solid rgba(255,255,255,0.7)",
+          borderRadius: "50%",
           fontFamily: '"Manrope", system-ui, sans-serif',
-          fontSize: 10, fontWeight: 700,
-          letterSpacing: "0.34em", textTransform: "uppercase",
-          backdropFilter: "blur(6px)",
+          fontSize: 26, lineHeight: 1, fontWeight: 300,
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
           cursor: "pointer",
-          transition: "background 220ms cubic-bezier(0.2,0.7,0.1,1), color 220ms cubic-bezier(0.2,0.7,0.1,1), transform 220ms cubic-bezier(0.2,0.7,0.1,1)",
+          touchAction: "manipulation",
+          transition: "background 200ms cubic-bezier(0.2,0.7,0.1,1), transform 200ms cubic-bezier(0.2,0.7,0.1,1)",
+        }}
+        onTouchStart={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.background = "#fff";
+          (e.currentTarget as HTMLButtonElement).style.color = "#0e0c0a";
+        }}
+        onTouchEnd={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.background = "rgba(0,0,0,0.55)";
+          (e.currentTarget as HTMLButtonElement).style.color = "#fff";
         }}
         onMouseEnter={(e) => {
           (e.currentTarget as HTMLButtonElement).style.background = "#fff";
           (e.currentTarget as HTMLButtonElement).style.color = "#0e0c0a";
         }}
         onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = "rgba(0,0,0,0.42)";
+          (e.currentTarget as HTMLButtonElement).style.background = "rgba(0,0,0,0.55)";
           (e.currentTarget as HTMLButtonElement).style.color = "#fff";
         }}
       >
-        Close
-        <span
-          style={{
-            display: "inline-flex", width: 22, height: 22,
-            alignItems: "center", justifyContent: "center",
-            borderRadius: "50%",
-            border: "1px solid currentColor",
-            fontSize: 11, lineHeight: 1, fontWeight: 600,
-            letterSpacing: 0,
-          }}
-        >×</span>
+        ×
       </button>
 
       {/* ESC hint — bottom-center, only when video is visible */}
       <div
         style={{
-          position: "absolute", left: "50%", bottom: 32,
+          position: "absolute", left: "50%",
+          bottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)",
           transform: "translateX(-50%)",
           fontFamily: '"Manrope", system-ui, sans-serif',
           fontSize: 9, fontWeight: 700, letterSpacing: "0.42em",
@@ -189,7 +211,8 @@ export default function MoetVideoOverlay() {
           pointerEvents: "none",
         }}
       >
-        Press <span style={{ color: "#fff" }}>Esc</span> to return
+        <span className="esc-hint">Press <span style={{ color: "#fff" }}>Esc</span> to return</span>
+        <span className="tap-hint" style={{ display: "none" }}>Tap <span style={{ color: "#fff" }}>Close</span> to return</span>
       </div>
     </div>
   );
