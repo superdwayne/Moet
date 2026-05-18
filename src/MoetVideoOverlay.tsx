@@ -16,10 +16,13 @@ const MOET_VIDEO_URL =
 //   pierce   0.78 → 0.85  (camera passing through the wall)
 //   ascend   0.85 → 1.00  (camera deep inside, rising up to the cork)
 //
-// Symmetric fade window — video fades from 0 → 1 between FADE_IN and FULL,
-// and back to 0 as you scroll out. Esc-close still works.
-const FADE_IN = 0.86;   // first hint of the video
-const FULL    = 0.94;   // fully opaque, deep inside
+// LATCH + CSS-driven fade — the half-transparent state is time-bounded
+// (FADE_MS) instead of being dragged out by slow scrolling. Cross SHOW_AT
+// going forward → state flips to shown; CSS smoothly fades opacity to 1.
+// Drop below HIDE_AT going back → state flips to hidden; CSS fades to 0.
+const SHOW_AT = 0.92;
+const HIDE_AT = 0.86;
+const FADE_MS = 350;
 
 export default function MoetVideoOverlay() {
   const wrapRef     = useRef<HTMLDivElement>(null);
@@ -58,30 +61,38 @@ export default function MoetVideoOverlay() {
     };
     window.addEventListener("keydown", onKey);
 
+    // Latched "shown" state — flips at the thresholds rather than tracking
+    // scroll continuously, so CSS can drive the actual fade at a fixed pace.
+    let shown = false;
+
     let raf = 0;
     const tick = () => {
       const o = scrollState.offset;
 
       // Auto-reset the close-button dismissal once the user scrolls back
-      // below the fade-in threshold, so re-entry fades in normally.
-      if (dismissedRef.current && o < FADE_IN) {
+      // below the hide threshold, so re-entry fades in normally.
+      if (dismissedRef.current && o < HIDE_AT) {
         dismissedRef.current = false;
       }
 
-      // Symmetric fade: opacity tracks scroll between FADE_IN (0) and FULL (1)
-      let opacity = 0;
-      if (!dismissedRef.current) {
-        opacity = Math.max(0, Math.min(1, (o - FADE_IN) / (FULL - FADE_IN)));
-      }
+      // Hysteresis: flip ON above SHOW_AT, flip OFF below HIDE_AT
+      const desired =
+        !dismissedRef.current &&
+        ((shown && o >= HIDE_AT) || (!shown && o >= SHOW_AT));
 
-      if (wrapRef.current) wrapRef.current.style.opacity = opacity.toFixed(3);
-
-      if (opacity > 0.02) {
-        if (v.paused) v.play().catch(() => {});
-        if (!visible) setVisible(true);
-      } else {
-        if (!v.paused) { v.pause(); v.currentTime = 0; }
-        if (visible) setVisible(false);
+      if (desired !== shown) {
+        shown = desired;
+        if (wrapRef.current) wrapRef.current.style.opacity = shown ? "1" : "0";
+        if (shown) {
+          if (v.paused) v.play().catch(() => {});
+          if (!visible) setVisible(true);
+        } else {
+          // Pause + reset only after the CSS fade-out completes
+          setTimeout(() => {
+            if (!shown && !v.paused) { v.pause(); v.currentTime = 0; }
+          }, FADE_MS + 30);
+          if (visible) setVisible(false);
+        }
       }
 
       raf = requestAnimationFrame(tick);
@@ -104,6 +115,7 @@ export default function MoetVideoOverlay() {
         position: "fixed", inset: 0, zIndex: 22,
         opacity: 0, pointerEvents: visible ? "auto" : "none",
         background: "#0e0c0a",
+        transition: `opacity ${FADE_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`,
       }}
     >
       <video
